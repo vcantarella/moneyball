@@ -1,0 +1,29 @@
+---
+title: "Regression using Moneyball Example"
+output: html_notebook
+---
+
+Checking for data in the dslabs package:
+```{r}
+library(dslabs)
+data(package = "dslabs")
+
+```
+I haven't found the Moneyball data here...
+
+```{r}
+library(Lahman)
+library(tidyverse)
+ds_theme_set()
+head(Teams)
+```
+Here it is!!
+And now I will save the table in rda format for the project:
+```{r}
+save(Teams, file = "rda/teams.rda")
+?Teams
+```
+
+
+
+

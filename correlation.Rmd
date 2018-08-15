@@ -1,0 +1,98 @@
+---
+title: "Correlation Coefficient"
+output:
+  html_document:
+    df_print: paged
+---
+
+$\rho = \frac{1}{n}\sum\limits_{i=1}^{n}(\frac{x_i-\mu_x}{\sigma_x})*(\frac{y_i-\mu_y}{\sigma_y})$
+
+```{r}
+library(tidyverse)
+library(HistData)
+data("GaltonFamilies")
+galton_heights <- GaltonFamilies%>%
+  filter(childNum == 1 & gender == "male")%>%
+  select(father, childHeight) %>%
+  rename(son = childHeight)
+galton_heights %>% summarise(cor(father, son))
+
+```
+
+Sample correlation is a random variable. And is the best predictor for the population correlation,
+
+```{r}
+set.seed(0)
+R <- sample_n(galton_heights, 25, replace = T) %>%
+  summarise(cor(father, son))
+R
+B <- 1000
+R <- replicate(B, {
+  sample_n(galton_heights, 25, replace = T) %>%
+  summarise(r = cor(father, son))%>%
+    .$r
+})
+data.frame(R)%>%
+  ggplot(aes(R))+geom_histogram(binwidth = 0.05, color = "black")
+```
+
+The correlation can also be applied with the Central Limit Theorem, therefore the correlation coefficient can be model by
+a normal variable with parameters:
+
+$R \sim N(\rho,\sqrt(\frac{1-r^2}{N-2})$
+
+Correlation is not always a good solution to infer trend between variables
+ - One example is the Ascombe quartet, a conjunct of artificial data with different trends, in which all of them produce the same correlation coefficient
+ 
+##Stratification
+
+One way to predict son height based on the sample information and the father's height is to do a stratification of the population and compute the conditional average:
+
+```{r}
+conditional_average <- galton_heights %>%
+  filter(round(father)==72)%>%
+  summarise(avg = mean(son))%>%
+  .$avg
+conditional_average
+```
+This is larger than the average son.
+
+stratification by boxplot can help to identify these stratas:
+
+```{r}
+galton_heights%>%
+  mutate(father_strata = factor(round(father)))%>%
+  ggplot(aes(x = father_strata,y = son))+
+  geom_boxplot()+
+  geom_point()
+```
+
+The means of each group seem to have a linear relationship:
+```{r}
+galton_heights%>%
+  mutate(father_strata = factor(round(father)))%>%
+  select(father_strata, son)%>%
+  group_by(father_strata)%>%
+  summarise(mean = mean(son))%>%
+  mutate(father_strata = as.numeric(father_strata))%>%
+  ggplot(aes(scale(father_strata), scale(mean)))+
+  geom_point()+geom_abline(intercept = 0, slope = 0.5)
+```
+
+##Bivariate Normal Distribution
+
+When a pair or variables (x,y) appear in a scatterplot with oval shape, it can be modelled as a bivariate normal distriution. Two variables highly correlated have a thin shape, or a circle if no correlation exists.
+both x and y must be approximately normally distributed.
+
+Exemple:
+
+How much of the variance of y can be explained by x:
+Ans: rho^2*100 [%]
+```{r}
+sd <- galton_heights %>%
+  summarise(sd = sd(son))%>%
+  pull(sd)
+1-(1-0.5^2)*sd^2/sd^2 
+
+```
+
