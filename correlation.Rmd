@@ -4,7 +4,7 @@ output:
   html_document:
     df_print: paged
 ---
-
+  
 $\rho = \frac{1}{n}\sum\limits_{i=1}^{n}(\frac{x_i-\mu_x}{\sigma_x})*(\frac{y_i-\mu_y}{\sigma_y})$
 
 ```{r}

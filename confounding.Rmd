@@ -1,0 +1,151 @@
+---
+title: "Confounding"
+output: html_notebook
+---
+
+#Confounding
+
+Loading data:
+```{r}
+load(file = "rda/teams.rda")
+```
+
+```{r}
+dat <- Teams %>%
+  filter(yearID %in% 1961:2001)%>%
+  mutate(R_game = R/G,
+         BB_game = BB/G,
+         HR_strata = (round(HR/G, 1)))%>%
+  filter(HR_strata >= 0.4 & HR_strata <= 1.2)
+dat %>%
+  ggplot(aes(BB_game, R_game))+geom_point(alpha=0.5)+
+  geom_smooth(method = "lm", se = F)+
+  facet_wrap(~HR_strata)
+```
+```{r}
+dat%>%
+  group_by(HR_strata)%>%
+  summarise(slope = cor(BB_game, R_game)*sd(R_game)/sd(BB_game))
+```
+
+
+RSS - Residual Sum Squares
+```{r}
+library(HistData)
+rss <- function(beta0, beta1, data){
+  resid <- galton_heights$son - (beta0+beta1*galton_heights$father)
+  return(sum(resid^2))
+}
+beta1 = seq(0, 1, len=nrow(galton_heights))
+results <- data.frame(beta1 = beta1, rss = sapply(beta1, rss, beta0 = 36))
+results %>% ggplot(aes(beta1, rss)) + geom_line() + 
+  geom_line(aes(beta1, rss), col=2)
+```
+
+#Linear Models
+
+lm function
+
+```{r}
+dat <- Teams %>%
+  filter(yearID %in% 1961:2001)%>%
+  mutate(R_game = R/G,
+         BB_game = BB/G,
+         HR_game = ((HR/G)))
+lm <- lm(R_game ~ BB_game + HR_game, data = dat)
+summary(lm)
+```
+
+
+Least Square Errors are random variables:
+
+
+```{r}
+B <- 1000
+N <- 100
+lse <- replicate(B, {
+  sample_n(galton_heights, N, replace = TRUE) %>% 
+    lm(son ~ father, data = .) %>% .$coef 
+})
+
+lse <- data.frame(beta_0 = lse[1,], beta_1 = lse[2,]) 
+lse %>% summarise(cor(beta_0, beta_1))
+```
+
+#More on linear models and tidyverse
+
+##Tibbles
+
+1. Tibbles display better:
+```{r}
+Teams
+```
+```{r}
+as_tibble(Teams)
+```
+
+2. Subsets of data frame don't return a data frame, but the object class:
+```{r}
+class(Teams[,20])
+```
+
+However when we use tibbles, the result is another tibble:
+```{r}
+class(as_tibble(Teams[,20]))
+```
+
+
+3. Tibbles can have more complex objects:
+
+For example we can put functions in a tibble:
+```{r}
+tibble(id = c(1,2,3), funcs = c(mean, median, sd))
+```
+
+
+4. We can group tibbles and the tidyverse functions are aware of them
+
+However the lm function does not know how to deal with grouped data. To solve this we will need to use the function do:
+
+##do function
+
+
+
+```{r}
+dat %>%
+  group_by(HR)%>%
+  do(fit = lm(R~BB, data = .))
+```
+
+```{r}
+get_slope <- function(dato){
+  fit <- lm(R ~ BB, data = dato)
+  data.frame(slope = fit$coefficients[2],
+             se = summary(fit)$coef[2,2])
+}
+dat %>%
+  group_by(HR_strata)%>%
+  do(get_slope(.))
+
+```
+
+##Broom Package! Designed to facilitate the use of models such as linear models with the tidyverse!!!
+
+```{r}
+dat%>%
+  group_by(HR_strata)%>%
+  do(tidy(lm(R~BB, data =.), conf.int = T))
+
+
+dat%>%
+  group_by(HR_strata)%>%
+  do(tidy(lm(R_game~BB_game, data =.), conf.int = T))%>%
+  filter(term == "BB_game")%>%
+  select(HR_strata, estimate, conf.low, conf.high)%>%
+  ggplot(aes(HR_strata, estimate, ymin = conf.low, ymax = conf.high))+
+  geom_errorbar()+geom_point()+geom_hline(yintercept = 0.37, col= "red")
+
+```
+
+
+
