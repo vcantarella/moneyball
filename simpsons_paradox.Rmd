@@ -1,0 +1,75 @@
+---
+title: "Simpson Paradox"
+output:
+  html_document:
+    df_print: paged
+---
+
+Besides Regression Fallacy, or Regression to the Mean, a common misconseption that must be adressed when one is dealing with linear regression is the Simpson Paradox.
+
+When the Simpson's Paradox Happens, it means that the sign of the correlation for the entire population flips when compared to the stratified sample.
+
+Here we will look at the 1973 Admission data from UC Berkeley:
+
+
+Data:
+```{r}
+library(dslabs)
+library(tidyverse)
+data("admissions")
+head(admissions)
+```
+
+
+At a first impression, one can see that the percentage admissions for men and women differ signifcantly for the entire population:
+
+```{r}
+admissions%>%
+  group_by(gender)%>%
+  summarise(percentage = round( sum(admitted*applicants)/sum(applicants),1))
+```
+
+And A Chi-squared test for statistical significance rejects the null hypothesis:
+
+```{r}
+library(broom)
+admissions%>%
+  group_by(gender)%>%
+  summarise(total_admitted = round(sum(admitted/100*applicants)), not_admitted = sum(applicants)-sum(total_admitted))%>%
+  select((-gender))%>%
+  do(tidy(chisq.test(.)))
+```
+
+Investigation of the data:
+
+
+```{r}
+admissions%>%
+  select(major, gender, admitted)%>%
+  spread(gender, admitted)%>%
+  mutate(women_minus_men = women - men)
+```
+Stratifying for the majors, there seems to not be significant difference between men and women. And a reason for the population bias might be due to major selectivity.
+
+checking the percentage of women applicants by major selectivity:
+
+```{r}
+admissions%>%
+  group_by(major)%>%
+  summarise(major_selectivity = sum(admitted*applicants)/sum(applicants), percentage_women_application = sum(applicants*(gender == "women"))/sum(applicants)*100)%>%
+  ggplot(aes(major_selectivity, percentage_women_application))+geom_text(aes(label = major))
+```
+
+As we can see from the plot, women tend to apply to more selective majors, while men are more in less selective majors.
+
+-> Gender and major selectivety are confounders
+
+```{r}
+admissions%>%
+  ggplot(aes(major, admitted, col = gender, size = applicants))+geom_point()
+```
+
+Here we have stratified the population by major and gender, and we can see that the admissions rate is not much different for each gender.
+
+
+
